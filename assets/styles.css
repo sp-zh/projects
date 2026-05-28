@@ -597,6 +597,64 @@ tbody tr:last-child td {
   color: var(--teal);
 }
 
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.insight-grid > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 22px;
+  box-shadow: 0 8px 28px rgba(20, 39, 59, 0.06);
+}
+
+.insight-grid p {
+  margin: 0;
+  color: #3d4c5c;
+}
+
+.wide-panel p {
+  font-size: 1.02rem;
+}
+
+.compare-note {
+  border-top: 4px solid var(--red);
+}
+
+.legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: center;
+  margin: -10px 0 14px;
+  color: #465564;
+  font-size: 0.92rem;
+  font-weight: 750;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 34px;
+  height: 3px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.pid-line {
+  background: var(--red);
+}
+
+.method-line {
+  background: var(--teal);
+}
+
+.effort-line {
+  background: var(--gold);
+}
+
 .footer {
   border-top: 1px solid var(--line);
   padding: 30px 16px;
@@ -630,7 +688,8 @@ tbody tr:last-child td {
   }
 
   .algorithm-grid,
-  .workflow {
+  .workflow,
+  .insight-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -680,7 +739,8 @@ tbody tr:last-child td {
   }
 
   .algorithm-grid,
-  .workflow {
+  .workflow,
+  .insight-grid {
     grid-template-columns: 1fr;
   }
 
