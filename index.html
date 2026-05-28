@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Control Algorithms: From PID to Learning Control</title>
+    <meta
+      name="description"
+      content="An engineering guide to classical, optimal, robust, and learning-based control algorithms with formulas, code, animations, comparisons, and applications."
+    />
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="nav" aria-label="Primary navigation">
+        <a class="brand" href="#top">Control Algorithms</a>
+        <div class="nav-links">
+          <a href="#simulator">Simulator</a>
+          <a href="#algorithms">Algorithms</a>
+          <a href="#comparison">Comparison</a>
+          <a href="#selection">Selection</a>
+        </div>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Classical, optimal, robust, and learning-based control</p>
+          <h1>Control Algorithms From PID to Reinforcement Learning</h1>
+          <p>
+            A practical reference for understanding how modern controllers are built:
+            the model assumptions, objective functions, mathematical structure,
+            implementable code, strengths, failure modes, and application domains.
+          </p>
+        </div>
+        <div class="hero-panel" aria-label="Animated closed-loop control diagram">
+          <canvas id="loopCanvas" width="720" height="420"></canvas>
+        </div>
+      </section>
+
+      <section class="section" id="simulator">
+        <div class="section-heading">
+          <p class="eyebrow">Interactive intuition</p>
+          <h2>Closed-Loop Step Response Lab</h2>
+          <p>
+            The animation below simulates a damped second-order plant. Select a controller
+            family to see typical response behavior, noise sensitivity, saturation, and
+            constraint handling. It is intentionally simple: the goal is intuition, not a
+            substitute for plant identification and validation.
+          </p>
+        </div>
+
+        <div class="simulator">
+          <div class="sim-toolbar" role="group" aria-label="Controller selection">
+            <button class="mode is-active" data-mode="pid">PID</button>
+            <button class="mode" data-mode="ffpid">Feedforward + PID</button>
+            <button class="mode" data-mode="notch">Notch / Lead-Lag</button>
+            <button class="mode" data-mode="lqr">LQR / LQI</button>
+            <button class="mode" data-mode="kalman">Kalman + LQR</button>
+            <button class="mode" data-mode="mpc">MPC</button>
+            <button class="mode" data-mode="robust">H∞ / μ</button>
+            <button class="mode" data-mode="rl">RL</button>
+          </div>
+          <div class="sim-grid">
+            <div class="canvas-shell">
+              <canvas id="responseCanvas" width="980" height="520"></canvas>
+            </div>
+            <aside class="metrics" aria-live="polite">
+              <h3 id="simTitle">PID</h3>
+              <dl>
+                <div><dt>Rise time</dt><dd id="riseTime">-</dd></div>
+                <div><dt>Overshoot</dt><dd id="overshoot">-</dd></div>
+                <div><dt>Settling</dt><dd id="settling">-</dd></div>
+                <div><dt>Control effort</dt><dd id="effort">-</dd></div>
+              </dl>
+              <p id="simNote"></p>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="algorithms">
+        <div class="section-heading">
+          <p class="eyebrow">Technical reference</p>
+          <h2>Algorithms, Principles, Formulas, and Code</h2>
+        </div>
+
+        <article class="algorithm" id="pid">
+          <h3>1. PID Control</h3>
+          <p>
+            PID is the baseline feedback controller. It drives the tracking error
+            <code>e(t)=r(t)-y(t)</code> toward zero using proportional correction,
+            accumulated error, and predicted trend from the error derivative.
+          </p>
+          <div class="formula">u(t)=K_p e(t)+K_i\int_0^t e(\tau)d\tau+K_d\frac{de(t)}{dt}</div>
+          <p>
+            Proportional action gives immediate stiffness, integral action removes
+            steady-state offset, and derivative action adds damping. The main practical
+            issues are actuator saturation, integral windup, derivative noise amplification,
+            and degraded behavior when the plant dynamics change.
+          </p>
+          <pre><code class="language-python">class PID:
+    def __init__(self, kp, ki, kd, dt, u_min=-float("inf"), u_max=float("inf")):
+        self.kp, self.ki, self.kd, self.dt = kp, ki, kd, dt
+        self.u_min, self.u_max = u_min, u_max
+        self.integral = 0.0
+        self.prev_error = 0.0
+
+    def update(self, reference, measurement):
+        error = reference - measurement
+        derivative = (error - self.prev_error) / self.dt
+        candidate_integral = self.integral + error * self.dt
+        u_unsat = self.kp * error + self.ki * candidate_integral + self.kd * derivative
+        u = max(self.u_min, min(self.u_max, u_unsat))
+        if u == u_unsat:
+            self.integral = candidate_integral
+        self.prev_error = error
+        return u</code></pre>
+        </article>
+
+        <article class="algorithm" id="ffpid">
+          <h3>2. Feedforward + PID</h3>
+          <p>
+            Feedforward uses a model of the plant or load to predict the input needed
+            before error appears. PID then corrects modeling error, disturbances, and
+            sensor bias.
+          </p>
+          <div class="formula">u(t)=u_{ff}(r,\dot r,\ddot r)+K_p e+K_i\int e\,dt+K_d\dot e</div>
+          <p>
+            For a mass-damper actuator, a common feedforward term is
+            <code>u_ff=m a_ref+b v_ref</code>. This improves tracking and reduces feedback
+            burden, but it depends on model accuracy and can command impossible inputs if
+            saturation is ignored.
+          </p>
+          <pre><code class="language-python">def feedforward_pid(r, v_ref, a_ref, y, pid, mass, damping):
+    u_ff = mass * a_ref + damping * v_ref
+    u_fb = pid.update(r, y)
+    return u_ff + u_fb</code></pre>
+        </article>
+
+        <article class="algorithm" id="notch">
+          <h3>3. Notch, Lead, and Lag Compensation</h3>
+          <p>
+            Frequency-domain compensators shape loop gain. A notch attenuates a narrow
+            resonance, a lead network adds phase margin and bandwidth, and a lag network
+            increases low-frequency gain to reduce steady-state error.
+          </p>
+          <div class="formula">G_{notch}(s)=\frac{s^2+2\zeta_z\omega_n s+\omega_n^2}{s^2+2\zeta_p\omega_n s+\omega_n^2},\quad \zeta_z&lt;\zeta_p</div>
+          <div class="formula">G_{lead}(s)=K\frac{\tau s+1}{\alpha\tau s+1},\quad 0&lt;\alpha&lt;1</div>
+          <p>
+            These methods are valuable when resonance, phase margin, or low-frequency
+            tracking is the dominant issue. Their weakness is limited multivariable
+            handling and sensitivity to resonance frequency drift.
+          </p>
+          <pre><code class="language-python">from scipy import signal
+
+def notch_filter(omega_n, zeta_zero, zeta_pole):
+    num = [1.0, 2.0 * zeta_zero * omega_n, omega_n**2]
+    den = [1.0, 2.0 * zeta_pole * omega_n, omega_n**2]
+    return signal.TransferFunction(num, den)</code></pre>
+        </article>
+
+        <article class="algorithm" id="gain-scheduling">
+          <h3>4. Gain Scheduling</h3>
+          <p>
+            Gain scheduling switches or interpolates controller parameters as operating
+            conditions change. It is common when one linear controller cannot cover a wide
+            nonlinear envelope, such as aircraft speed, motor load, battery voltage, or
+            robot configuration.
+          </p>
+          <div class="formula">K(\rho)=\sum_i w_i(\rho)K_i,\quad \sum_i w_i(\rho)=1,\quad w_i(\rho)\ge 0</div>
+          <p>
+            The schedule variable <code>ρ</code> must be measurable or estimable. Poor
+            scheduling can introduce discontinuities, hidden instability between design
+            points, and unexpected behavior during fast transients.
+          </p>
+          <pre><code class="language-python">def scheduled_gain(speed):
+    breakpoints = [0.0, 10.0, 25.0]
+    kp_values = [3.0, 2.1, 1.2]
+    if speed <= breakpoints[0]:
+        return kp_values[0]
+    if speed >= breakpoints[-1]:
+        return kp_values[-1]
+    for i in range(len(breakpoints) - 1):
+        lo, hi = breakpoints[i], breakpoints[i + 1]
+        if lo <= speed <= hi:
+            a = (speed - lo) / (hi - lo)
+            return (1 - a) * kp_values[i] + a * kp_values[i + 1]</code></pre>
+        </article>
+
+        <article class="algorithm" id="pole-placement">
+          <h3>5. Pole Placement</h3>
+          <p>
+            Pole placement designs state feedback so the closed-loop poles match desired
+            locations. For a controllable linear system <code>x_dot=Ax+Bu</code>, choose
+            <code>u=-Kx+r</code> so that the eigenvalues of <code>A-BK</code> determine the
+            transient response.
+          </p>
+          <div class="formula">\lambda(A-BK)=\{p_1,p_2,\ldots,p_n\}</div>
+          <p>
+            It is transparent and effective for low-order systems, but aggressive pole
+            choices can require large actuator effort and amplify unmodeled dynamics.
+          </p>
+          <pre><code class="language-python">import numpy as np
+from scipy.signal import place_poles
+
+A = np.array([[0.0, 1.0], [-2.0, -0.4]])
+B = np.array([[0.0], [1.0]])
+desired_poles = [-2.0 + 1.5j, -2.0 - 1.5j]
+K = place_poles(A, B, desired_poles).gain_matrix</code></pre>
+        </article>
+
+        <article class="algorithm" id="lqr">
+          <h3>6. Linear Quadratic Regulator</h3>
+          <p>
+            LQR computes a state-feedback law that minimizes a quadratic trade-off between
+            state error and control effort. It replaces manual pole selection with an
+            optimization problem.
+          </p>
+          <div class="formula">J=\int_0^\infty (x^TQx+u^TRu)\,dt,\quad u=-Kx,\quad K=R^{-1}B^TP</div>
+          <div class="formula">A^TP+PA-PBR^{-1}B^TP+Q=0</div>
+          <p>
+            Larger entries in <code>Q</code> penalize state deviation; larger entries in
+            <code>R</code> penalize actuator usage. LQR is powerful but assumes a reliable
+            linear model and full-state feedback unless paired with an observer.
+          </p>
+          <pre><code class="language-python">import numpy as np
+from scipy.linalg import solve_continuous_are
+
+def lqr(A, B, Q, R):
+    P = solve_continuous_are(A, B, Q, R)
+    K = np.linalg.inv(R) @ B.T @ P
+    return K</code></pre>
+        </article>
+
+        <article class="algorithm" id="lqi">
+          <h3>7. Linear Quadratic Integral Control</h3>
+          <p>
+            LQI augments LQR with integral states so the controller rejects constant
+            disturbances and tracks references without steady-state error.
+          </p>
+          <div class="formula">\dot z=r-Cx,\quad \frac{d}{dt}\begin{bmatrix}x\\z\end{bmatrix}=\begin{bmatrix}A&0\\-C&0\end{bmatrix}\begin{bmatrix}x\\z\end{bmatrix}+\begin{bmatrix}B\\0\end{bmatrix}u+\begin{bmatrix}0\\I\end{bmatrix}r</div>
+          <p>
+            It is often the practical upgrade from LQR for tracking problems. The cost is
+            slower dynamics, extra tuning, and windup-like behavior if saturation is not
+            handled.
+          </p>
+          <pre><code class="language-python">def augment_for_lqi(A, B, C):
+    n, m = B.shape
+    p = C.shape[0]
+    A_aug = np.block([[A, np.zeros((n, p))], [-C, np.zeros((p, p))]])
+    B_aug = np.vstack([B, np.zeros((p, m))])
+    return A_aug, B_aug</code></pre>
+        </article>
+
+        <article class="algorithm" id="kalman-lqr">
+          <h3>8. Kalman Filter + LQR</h3>
+          <p>
+            When all states are not measured, a Kalman filter estimates them from noisy
+            measurements. LQR then acts on the estimate. Together they form the classic
+            Linear Quadratic Gaussian controller under Gaussian noise assumptions.
+          </p>
+          <div class="formula">\hat x^-_k=A\hat x_{k-1}+Bu_{k-1},\quad K_f=P^-C^T(CP^-C^T+R_v)^{-1}</div>
+          <div class="formula">\hat x_k=\hat x^-_k+K_f(y_k-C\hat x^-_k),\quad u_k=-K\hat x_k</div>
+          <p>
+            The separation principle allows estimator and controller design separately for
+            ideal linear systems. In real plants, poor noise models, delays, and unmodeled
+            bias can destabilize or degrade performance.
+          </p>
+          <pre><code class="language-python">def kalman_update(x, P, u, y, A, B, C, Qn, Rn):
+    x_pred = A @ x + B @ u
+    P_pred = A @ P @ A.T + Qn
+    S = C @ P_pred @ C.T + Rn
+    L = P_pred @ C.T @ np.linalg.inv(S)
+    x_new = x_pred + L @ (y - C @ x_pred)
+    P_new = (np.eye(P.shape[0]) - L @ C) @ P_pred
+    return x_new, P_new</code></pre>
+        </article>
+
+        <article class="algorithm" id="mpc">
+          <h3>9. Model Predictive Control</h3>
+          <p>
+            MPC repeatedly solves a finite-horizon constrained optimization problem. It
+            predicts future states, chooses an input sequence, applies only the first
+            input, then replans at the next sample.
+          </p>
+          <div class="formula">\min_{u_{0:N-1}}\sum_{k=0}^{N-1}(x_k^TQx_k+u_k^TRu_k)+x_N^TP_fx_N</div>
+          <div class="formula">x_{k+1}=Ax_k+Bu_k,\quad x_k\in\mathcal X,\quad u_k\in\mathcal U</div>
+          <p>
+            MPC is excellent for constraints, multivariable coupling, and economic
+            objectives. Its issues are computational cost, model dependence, feasibility,
+            and the need for robust fallback behavior.
+          </p>
+          <pre><code class="language-python"># Minimal cvxpy-style MPC sketch
+import cvxpy as cp
+
+def mpc_control(A, B, x0, Q, R, u_max, horizon):
+    n, m = B.shape
+    x = cp.Variable((n, horizon + 1))
+    u = cp.Variable((m, horizon))
+    cost = 0
+    constraints = [x[:, 0] == x0]
+    for k in range(horizon):
+        cost += cp.quad_form(x[:, k], Q) + cp.quad_form(u[:, k], R)
+        constraints += [x[:, k + 1] == A @ x[:, k] + B @ u[:, k]]
+        constraints += [cp.abs(u[:, k]) <= u_max]
+    problem = cp.Problem(cp.Minimize(cost), constraints)
+    problem.solve()
+    return u[:, 0].value</code></pre>
+        </article>
+
+        <article class="algorithm" id="hinf">
+          <h3>10. H∞ Control</h3>
+          <p>
+            H∞ control designs a controller that minimizes worst-case amplification from
+            exogenous disturbances to regulated outputs. Instead of optimizing average
+            quadratic performance, it optimizes a frequency-domain worst-case bound.
+          </p>
+          <div class="formula">\|T_{zw}(s)\|_\infty=\sup_\omega \bar\sigma(T_{zw}(j\omega))&lt;\gamma</div>
+          <p>
+            Weighting functions encode performance, control effort, noise rejection, and
+            robustness. H∞ is valuable when guaranteed disturbance rejection matters, but
+            synthesis can produce high-order controllers and requires expert weighting.
+          </p>
+          <pre><code class="language-python"># Python-control sketch; exact APIs depend on installed slycot/control versions.
+import control as ct
+
+P = ct.ss(A, B, C, D)
+# K, closed_loop, gamma, info = ct.hinfsyn(P, nmeas=1, ncon=1)</code></pre>
+        </article>
+
+        <article class="algorithm" id="mu">
+          <h3>11. μ-Synthesis</h3>
+          <p>
+            μ-synthesis extends robust control to structured uncertainty. Instead of
+            asking whether all uncertainty is small in an unstructured norm, it preserves
+            the block structure of parameter variations, neglected dynamics, and actuator
+            uncertainty.
+          </p>
+          <div class="formula">\mu_\Delta(M)=\frac{1}{\min\{\bar\sigma(\Delta):\det(I-M\Delta)=0\}}</div>
+          <p>
+            The standard workflow is D-K iteration: synthesize an H∞ controller for a
+            scaled plant, analyze structured singular value, update scaling, and repeat.
+            It is powerful for aerospace and precision systems, but hard to tune and may
+            produce controllers too complex for embedded deployment.
+          </p>
+          <pre><code class="language-python"># Pseudocode for D-K iteration
+K = initial_hinf_controller(P)
+for _ in range(max_iterations):
+    mu_bound, D_scale = structured_singular_value_analysis(P, K)
+    P_scaled = apply_d_scaling(P, D_scale)
+    K = hinf_synthesis(P_scaled)
+    if mu_bound < 1.0:
+        break</code></pre>
+        </article>
+
+        <article class="algorithm" id="rl">
+          <h3>12. Reinforcement Learning Control</h3>
+          <p>
+            RL learns a policy from interaction. The controller chooses actions to
+            maximize expected cumulative reward, often without an explicit analytic model.
+            In control, the reward usually penalizes tracking error, energy, constraint
+            violation, and unsafe states.
+          </p>
+          <div class="formula">J(\pi)=\mathbb E_\pi\left[\sum_{t=0}^{\infty}\gamma^t r(s_t,a_t)\right],\quad a_t=\pi_\theta(s_t)</div>
+          <div class="formula">\nabla_\theta J\approx\mathbb E[\nabla_\theta\log\pi_\theta(a_t|s_t)A_t]</div>
+          <p>
+            RL is attractive for high-dimensional nonlinear tasks and policies that are
+            hard to hand-design. The practical problems are sample cost, safety during
+            exploration, sim-to-real transfer, reward hacking, weak guarantees, and
+            difficult debugging.
+          </p>
+          <pre><code class="language-python"># Minimal policy-gradient skeleton
+for episode in range(num_episodes):
+    states, actions, rewards = rollout(env, policy)
+    returns = discounted_returns(rewards, gamma=0.99)
+    loss = 0.0
+    for s, a, G in zip(states, actions, returns):
+        loss -= policy.log_prob(s, a) * G
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()</code></pre>
+        </article>
+      </section>
+
+      <section class="section" id="comparison">
+        <div class="section-heading">
+          <p class="eyebrow">Engineering trade-offs</p>
+          <h2>Comparison Matrix</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>Core strength</th>
+                <th>Main weakness</th>
+                <th>Best fit</th>
+                <th>Typical maturity</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>PID</td><td>Simple, cheap, robust enough for many loops</td><td>Tuning, windup, poor MIMO handling</td><td>Temperature, speed, pressure, position loops</td><td>Production standard</td></tr>
+              <tr><td>Feedforward + PID</td><td>Better tracking with less feedback effort</td><td>Needs a usable model</td><td>Motion control, robotics, process setpoint changes</td><td>Production standard</td></tr>
+              <tr><td>Notch / Lead-Lag</td><td>Frequency shaping and resonance handling</td><td>Narrow validity, manual design</td><td>Flexible structures, drives, servo systems</td><td>Production standard</td></tr>
+              <tr><td>Gain Scheduling</td><td>Covers nonlinear operating envelopes</td><td>Hidden instability between points</td><td>Aircraft, engines, battery systems, robots</td><td>Production standard</td></tr>
+              <tr><td>Pole Placement</td><td>Direct transient shaping</td><td>Can demand excessive control effort</td><td>Low-order state-space systems</td><td>Educational and production niche</td></tr>
+              <tr><td>LQR</td><td>Optimal trade-off between state error and effort</td><td>Model and state measurement dependence</td><td>Balancing, vehicles, spacecraft, robotics</td><td>Production standard</td></tr>
+              <tr><td>LQI</td><td>LQR with zero steady-state tracking error</td><td>Extra states and saturation sensitivity</td><td>Servo tracking and disturbance rejection</td><td>Production standard</td></tr>
+              <tr><td>Kalman + LQR</td><td>Optimal estimation plus optimal feedback</td><td>Noise-model and delay sensitivity</td><td>Navigation, drones, robotics, aerospace</td><td>Production standard</td></tr>
+              <tr><td>MPC</td><td>Handles constraints and multivariable coupling</td><td>Compute cost and feasibility management</td><td>Process control, autonomous driving, energy systems</td><td>Production standard</td></tr>
+              <tr><td>H∞</td><td>Worst-case disturbance attenuation</td><td>Weighting expertise, high controller order</td><td>Aerospace, precision equipment, uncertain systems</td><td>Specialist production</td></tr>
+              <tr><td>μ-Synthesis</td><td>Structured uncertainty robustness</td><td>Complex design and implementation</td><td>High-consequence robust control</td><td>Specialist production</td></tr>
+              <tr><td>RL</td><td>Learns nonlinear policies from data</td><td>Safety, guarantees, sample efficiency</td><td>Games, legged robots, adaptive high-dimensional tasks</td><td>Research to selective production</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" id="selection">
+        <div class="section-heading">
+          <p class="eyebrow">Practical selection</p>
+          <h2>How to Choose</h2>
+        </div>
+        <div class="choice-grid">
+          <div>
+            <h3>Start simple</h3>
+            <p>
+              If the plant is single-input/single-output and constraints are mild, start
+              with PID, then add feedforward, anti-windup, filtering, and frequency
+              compensation only when the data says they are needed.
+            </p>
+          </div>
+          <div>
+            <h3>Use state-space when interactions matter</h3>
+            <p>
+              For coupled dynamics, multivariable plants, and measurable or estimable
+              states, pole placement, LQR, LQI, and Kalman-filtered LQR offer a cleaner
+              design language than many independent PID loops.
+            </p>
+          </div>
+          <div>
+            <h3>Use MPC when constraints are first-class</h3>
+            <p>
+              If actuator limits, safety envelopes, rate limits, and economic objectives
+              dominate performance, MPC is often the most direct formulation.
+            </p>
+          </div>
+          <div>
+            <h3>Use robust or learning control deliberately</h3>
+            <p>
+              H∞ and μ-synthesis are justified when uncertainty must be certified. RL is
+              justified when model-based design cannot capture the task and safe training
+              infrastructure exists.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Control Algorithms Guide · Built as a static GitHub Pages reference.</p>
+    </footer>
+
+    <script src="assets/app.js"></script>
+  </body>
+</html>
