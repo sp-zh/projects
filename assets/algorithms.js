@@ -259,8 +259,9 @@ def mpc_control(A, B, x0, Q, R, u_max, N):
     family: "Robust control",
     formula: "\\[\\|T_{zw}(s)\\|_\\infty=\\sup_{\\omega}\\bar\\sigma\\left(T_{zw}(j\\omega)\\right)<\\gamma\\]",
     principle: [
-      "H∞ control asks for a controller that bounds the worst-case gain from disturbance inputs \\(w\\) to regulated outputs \\(z\\).",
-      "Weighting functions shape tracking, control effort, sensor noise, and robustness requirements. The controller minimizes the peak singular value over frequency."
+      "H∞ control asks for a controller that bounds the worst-case gain from disturbance inputs \\(w\\) to regulated outputs \\(z\\). The design is not centered on the nominal trajectory; it is centered on the largest admissible amplification from disturbance to performance output.",
+      "Weighting functions shape tracking, control effort, sensor noise, and robustness requirements. A typical generalized plant has the form \\(\\begin{bmatrix} z \\\\ y \\end{bmatrix}=P(s)\\begin{bmatrix} w \\\\ u \\end{bmatrix}\\), and the closed-loop transfer \\(T_{zw}\\) is then minimized in the \\(H_\\infty\\) norm.",
+      "A standard choice is to rewrite the design in terms of sensitivity functions. If \\(L(s)=P(s)K(s)\\), then \\(S=(I+L)^{-1}\\) and \\(T=L(I+L)^{-1}\\). Weighting \\(W_1 S\\), \\(W_2 K S\\), and \\(W_3 T\\) lets one encode tracking, effort, and noise rejection in a single inequality."
     ],
     design: ["Build a generalized plant", "Choose performance and robustness weighting functions", "Reduce controller order if needed and validate margins"],
     advantages: ["Explicit worst-case disturbance rejection", "Strong robustness language", "Useful for uncertain high-value systems"],
@@ -272,7 +273,9 @@ import control as ct
 P = ct.ss(A, B, C, D)
 # K, CL, gamma, info = ct.hinfsyn(P, nmeas=ny, ncon=nu)`,
     references: [
-      { text: "G. Zames, Feedback and optimal sensitivity: model reference transformations, multiplicative seminorms, and approximate inverses, 1981.", url: "https://doi.org/10.1109/TAC.1981.1102671" }
+      { text: "G. Zames, Feedback and optimal sensitivity: model reference transformations, multiplicative seminorms, and approximate inverses, 1981.", url: "https://doi.org/10.1109/TAC.1981.1102671" },
+      { text: "J. C. Doyle, K. Glover, P. P. Khargonekar, and B. A. Francis, State-space solutions to standard H2 and H∞ control problems, 1989.", url: "https://doi.org/10.1109/9.25303" },
+      { text: "K. Zhou, J. C. Doyle, and K. Glover, Robust and Optimal Control, 1996.", url: "https://books.google.com/books?id=UqYqGgAACAAJ" }
     ],
     comparison: ["Worst-case induced gain", "High", "Indirect", "Conservative weights or high-order controller"]
   },
@@ -283,8 +286,9 @@ P = ct.ss(A, B, C, D)
     family: "Advanced robust control",
     formula: "\\[\\mu_\\Delta(M)=\\frac{1}{\\min\\{\\bar\\sigma(\\Delta):\\det(I-M\\Delta)=0\\}}\\]",
     principle: [
-      "μ-synthesis keeps the structure of uncertainty blocks instead of treating uncertainty as one unstructured norm-bounded perturbation.",
-      "The common practical workflow is D-K iteration: synthesize an H∞ controller for a scaled plant, analyze structured singular value, update scaling, and repeat."
+      "μ-synthesis keeps the structure of uncertainty blocks instead of treating uncertainty as one unstructured norm-bounded perturbation. That structure matters because a 5% sensor-gain error is not the same as a 5% flexible-mode error.",
+      "The common practical workflow is D-K iteration: synthesize an H∞ controller for a scaled plant, analyze structured singular value, update scaling, and repeat. The scaling matrices \\(D\\) approximate the size of the smallest destabilizing structured uncertainty.",
+      "A useful intuition is that H∞ asks for a small worst-case gain, while μ asks whether the loop remains stable against a block-structured family of perturbations. In practice, the two are often paired: H∞ provides the synthesis step inside D-K iteration, and μ evaluates the structured robustness margin."
     ],
     design: ["Define uncertainty blocks honestly", "Run D-K iteration", "Reduce and validate the controller against sampled uncertain plants"],
     advantages: ["Handles structured uncertainty", "Closer to certification-style robustness", "Powerful for high-consequence systems"],
@@ -299,7 +303,9 @@ for iteration in range(max_iterations):
         break`,
     references: [
       { text: "J. C. Doyle, Analysis of feedback systems with structured uncertainties, 1982.", url: "https://doi.org/10.1049/ip-d.1982.0053" },
-      { text: "A. Packard and J. Doyle, The complex structured singular value, Automatica, 1993.", url: "https://doi.org/10.1016/0005-1098(93)90032-S" }
+      { text: "A. Packard and J. Doyle, The complex structured singular value, Automatica, 1993.", url: "https://doi.org/10.1016/0005-1098(93)90032-S" },
+      { text: "S. Skogestad and I. Postlethwaite, Multivariable Feedback Control: Analysis and Design, 2nd ed.", url: "https://www.wiley.com/en-us/Multivariable+Feedback+Control%3A+Analysis+and+Design%2C+2nd+Edition-p-9780470011676" },
+      { text: "K. Zhou, J. C. Doyle, and K. Glover, Robust and Optimal Control, 1996.", url: "https://books.google.com/books?id=UqYqGgAACAAJ" }
     ],
     comparison: ["Structured worst-case robustness", "Very high", "Indirect", "Modeling uncertainty incorrectly"]
   },
@@ -311,7 +317,9 @@ for iteration in range(max_iterations):
     formula: "\\[J(\\pi_\\theta)=\\mathbb E_{\\pi_\\theta}\\left[\\sum_{t=0}^{\\infty}\\gamma^t r(s_t,a_t)\\right],\\qquad \\nabla_\\theta J\\approx\\mathbb E[\\nabla_\\theta\\log\\pi_\\theta(a_t|s_t)A_t]\\]",
     principle: [
       "RL treats control as sequential decision-making. A policy chooses actions, the environment returns rewards, and learning updates the policy to improve expected return.",
-      "For physical control, the reward must encode tracking, energy, smoothness, safety, and constraint violation. The hard part is not writing the objective; it is making exploration safe and transfer reliable."
+      "For physical control, the reward must encode tracking, energy, smoothness, safety, and constraint violation. The hard part is not writing the objective; it is making exploration safe and transfer reliable.",
+      "There are two common viewpoints: value-based RL estimates \\(V^\\pi(s)=\\mathbb E_\\pi[\\sum_{k=0}^{\\infty}\\gamma^k r_{t+k} \\mid s_t=s]\\), while policy-gradient RL directly parameterizes \\(\\pi_\\theta(a|s)\\) and improves the expected return through sampled gradients.",
+      "Bellman equations make the dynamic-programming connection explicit: \\(V^\\pi(s)=\\mathbb E[r+\\gamma V^\\pi(s_{t+1})]\\). In actor-critic methods, the critic estimates value or advantage and the actor updates the policy using that estimate."
     ],
     design: ["Train in simulation with domain randomization", "Constrain exploration or use offline/safe RL", "Validate against model-based baselines and safety monitors"],
     advantages: ["Can learn nonlinear high-dimensional policies", "Works when analytic control design is hard", "Can exploit data and simulation"],
@@ -328,7 +336,10 @@ for iteration in range(max_iterations):
     optimizer.step()`,
     references: [
       { text: "R. S. Sutton and A. G. Barto, Reinforcement Learning: An Introduction.", url: "http://incompleteideas.net/book/the-book-2nd.html" },
-      { text: "J. García and F. Fernández, A comprehensive survey on safe reinforcement learning, 2015.", url: "https://doi.org/10.5555/2909829.2909909" }
+      { text: "J. García and F. Fernández, A comprehensive survey on safe reinforcement learning, 2015.", url: "https://doi.org/10.5555/2909829.2909909" },
+      { text: "R. S. Sutton et al., Policy Gradient Methods for Reinforcement Learning with Function Approximation, 2000.", url: "https://proceedings.neurips.cc/paper_files/paper/1999/file/464d828b85b0bed98e80ade0a5c43b0f-Paper.pdf" },
+      { text: "D. Silver et al., Deterministic Policy Gradient Algorithms, 2014.", url: "https://proceedings.mlr.press/v32/silver14.html" },
+      { text: "J. Achiam et al., Constrained Policy Optimization, 2017.", url: "https://proceedings.mlr.press/v70/achiam17a.html" }
     ],
     comparison: ["Expected cumulative reward", "Optional but useful", "Through reward, shields, or constrained RL", "Unsafe exploration and weak guarantees"]
   }
@@ -337,3 +348,19 @@ for iteration in range(max_iterations):
 function getAlgorithm(slug) {
   return ALGORITHMS.find((item) => item.slug === slug);
 }
+
+
+const OVERVIEW_SCORES = {
+  pid: { model: 1, constraints: 1, robustness: 1, computation: 1, note: "baseline, cheap, local" },
+  "feedforward-pid": { model: 2, constraints: 1, robustness: 2, computation: 1, note: "model help without much cost" },
+  "notch-lead-lag": { model: 2, constraints: 1, robustness: 2, computation: 1, note: "frequency shaping" },
+  "gain-scheduling": { model: 3, constraints: 1, robustness: 3, computation: 2, note: "multiple local models" },
+  "pole-placement": { model: 3, constraints: 1, robustness: 2, computation: 2, note: "state-space and eigenvalues" },
+  lqr: { model: 4, constraints: 1, robustness: 3, computation: 2, note: "optimal state coupling" },
+  lqi: { model: 4, constraints: 1, robustness: 3, computation: 2, note: "tracking with integral state" },
+  "kalman-lqr": { model: 4, constraints: 1, robustness: 3, computation: 3, note: "estimation plus optimal feedback" },
+  mpc: { model: 4, constraints: 5, robustness: 3, computation: 5, note: "constraints are native" },
+  hinf: { model: 5, constraints: 2, robustness: 5, computation: 4, note: "worst-case design" },
+  "mu-synthesis": { model: 5, constraints: 2, robustness: 5, computation: 5, note: "structured uncertainty" },
+  "reinforcement-learning": { model: 2, constraints: 3, robustness: 2, computation: 5, note: "data-driven and expensive" }
+};

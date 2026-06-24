@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Overview Comparison</title>
+    <meta name="description" content="A visual overview comparing control methods by model dependence, constraints, robustness, and computation." />
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="nav" aria-label="Primary navigation">
+        <a class="brand" href="index.html">Control Atlas</a>
+        <div class="nav-links">
+          <a href="index.html#map">Map</a>
+          <a href="index.html#comparison">Comparison</a>
+          <a href="index.html#workflow">Workflow</a>
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero overview-hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Cross-method view</p>
+          <h1>Overview Comparison</h1>
+          <p>
+            This page summarizes the methods on four axes: model dependence, constraint handling, robustness, and computation. Larger values mean more of that property.
+          </p>
+        </div>
+        <div class="hero-panel">
+          <canvas id="overviewCanvas" width="760" height="430" aria-label="Overview heatmap and score chart"></canvas>
+        </div>
+      </section>
+
+      <section class="overview-layout">
+        <div class="overview-card">
+          <div class="overview-legend">
+            <span class="legend-chip"><i class="legend-swatch score-1"></i> 1 = low</span>
+            <span class="legend-chip"><i class="legend-swatch score-3"></i> 3 = medium</span>
+            <span class="legend-chip"><i class="legend-swatch score-5"></i> 5 = high</span>
+          </div>
+          <div class="overview-chart" id="overviewChart"></div>
+        </div>
+
+        <div class="overview-intro">
+          <div class="metric-card">
+            <h3>Model dependence</h3>
+            <p>How much plant structure or a usable model is needed before the method is practical.</p>
+          </div>
+          <div class="metric-card">
+            <h3>Constraints</h3>
+            <p>Whether the method handles actuator and state limits directly instead of as an afterthought.</p>
+          </div>
+          <div class="metric-card">
+            <h3>Robustness</h3>
+            <p>How deliberately the method accounts for model mismatch, disturbances, and uncertainty.</p>
+          </div>
+          <div class="metric-card">
+            <h3>Computation</h3>
+            <p>How expensive the online implementation is relative to the classical baseline.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p><a href="index.html">Back to Control Algorithms Atlas</a></p>
+    </footer>
+
+    <script src="assets/algorithms.js"></script>
+    <script src="assets/overview.js"></script>
+  </body>
+</html>

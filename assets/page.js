@@ -134,9 +134,11 @@ const DETAIL_NOTES = {
       "It is most useful when performance, noise, and control effort can be expressed through meaningful weighting functions."
     ],
     derivation: [
-      "Build a generalized plant with disturbance input \\(w\\), control input \\(u\\), measured output \\(y\\), and regulated output \\(z\\). The controller closes the loop and produces a transfer matrix \\(T_{zw}(s)\\).",
-      "The H∞ norm is the largest singular value over all frequencies: \\(\\|T_{zw}\\|_\\infty=\\sup_\\omega\\bar\\sigma(T_{zw}(j\\omega))\\). It measures worst-case energy gain from disturbance to performance output.",
-      "Synthesis seeks a stabilizing controller such that \\(\\|T_{zw}\\|_\\infty<\\gamma\\). Weighting functions decide what counts as tracking error, actuator penalty, sensor noise, and robustness margin."
+      "Build a generalized plant with disturbance input \(w\), control input \(u\), measured output \(y\), and regulated output \(z\). The controller closes the loop and produces a transfer matrix \(T_{zw}(s)\).",
+      "The H∞ norm is the largest singular value over all frequencies: \(\|T_{zw}\|_\infty=\sup_\omega\bar\sigma(T_{zw}(j\omega))\). It measures worst-case energy gain from disturbance to performance output.",
+      "For a SISO loop, the key closed-loop objects are sensitivity \(S=(I+PK)^{-1}\), complementary sensitivity \(T=PK(I+PK)^{-1}\), and control sensitivity \(KS\). A mixed-sensitivity design often minimizes \(\|[W_1S\; W_2KS\; W_3T]^T\|_\infty\).",
+      "The weights are not cosmetic. \(W_1\) encodes low-frequency tracking and disturbance rejection, \(W_2\) limits actuator effort, and \(W_3\) suppresses high-frequency noise and unmodeled dynamics. A bad weight choice gives a mathematically valid but physically poor controller.",
+      "Synthesis seeks a stabilizing controller such that \(\|T_{zw}\|_\infty<\gamma\). In state-space algorithms this condition is solved through coupled Riccati or LMI-style feasibility tests, then the resulting high-order controller is reduced and validated."
     ],
     pidCompare: "Compared with PID tuned for a nominal plant, H∞ deliberately sacrifices some nominal speed to keep performance bounded under disturbance and model uncertainty."
   },
@@ -147,9 +149,11 @@ const DETAIL_NOTES = {
       "It is specialist machinery and should be justified by certification or robustness requirements."
     ],
     derivation: [
-      "Robust stability can be framed as an interconnection between a nominal transfer matrix \\(M\\) and uncertainty \\(\\Delta\\). The question is whether \\(I-M\\Delta\\) can become singular for allowable \\(\\Delta\\).",
-      "The structured singular value \\(\\mu_\\Delta(M)\\) measures the smallest structured uncertainty that can destabilize the loop. If \\(\\mu_\\Delta(M(j\\omega))<1\\) over frequency, the system is robust to the modeled uncertainty set.",
-      "D-K iteration alternates between controller synthesis and scaling: D-scales estimate the structured robustness bound, then H∞ synthesis is run on the scaled problem. This is powerful but not convex as a whole."
+      "Robust stability can be framed as an interconnection between a nominal transfer matrix \(M\) and uncertainty \(\Delta\). The question is whether \(I-M\Delta\) can become singular for allowable \(\Delta\).",
+      "The small-gain theorem gives a simple unstructured test: if \(\|M\|_\infty<1\), then the loop is stable for every \(\|\Delta\|_\infty\le 1\). This is safe but conservative when the uncertainty has known block structure.",
+      "The structured singular value \(\mu_\Delta(M)\) measures the smallest structured uncertainty that can destabilize the loop. If \(\mu_\Delta(M(j\omega))<1\) over frequency, the system is robust to the modeled uncertainty set.",
+      "D-K iteration alternates between controller synthesis and scaling: D-scales estimate the structured robustness bound, then H∞ synthesis is run on the scaled problem. The scaling step tries to expose which uncertainty block is most dangerous at each frequency.",
+      "The method is powerful because it can distinguish actuator uncertainty, sensor uncertainty, parameter variation, and neglected flexible modes. It is difficult because the result depends heavily on whether those uncertainty blocks were modeled honestly."
     ],
     pidCompare: "Compared with PID, μ-synthesis is not about hand tuning one response. It designs against a structured family of possible plants and tries to keep all of them stable and acceptable."
   },
@@ -160,8 +164,10 @@ const DETAIL_NOTES = {
       "Avoid RL as a first answer for safety-critical control unless a supervisory safety layer, validation pipeline, and fallback controller exist."
     ],
     derivation: [
-      "RL models control as a Markov decision process with state \\(s_t\\), action \\(a_t\\), transition distribution, reward \\(r_t\\), and policy \\(\\pi_\\theta(a|s)\\).",
-      "The objective is expected discounted return \\(J(\\pi_\\theta)=\\mathbb E[\\sum_t\\gamma^tr_t]\\). Policy-gradient methods estimate \\(\\nabla_\\theta J\\) using sampled rollouts and an advantage estimate \\(A_t\\), which measures whether an action was better than expected.",
+      "RL models control as a Markov decision process with state \(s_t\), action \(a_t\), transition distribution, reward \(r_t\), and policy \(\pi_\theta(a|s)\).",
+      "The value function satisfies the Bellman relation \(V^\pi(s)=\mathbb E_\pi[r(s,a)+\gamma V^\pi(s')]\). This equation is the dynamic-programming backbone behind value iteration, Q-learning, actor-critic methods, and model-based RL.",
+      "The objective is expected discounted return \(J(\pi_\theta)=\mathbb E[\sum_t\gamma^tr_t]\). Policy-gradient methods estimate \(\nabla_\theta J\) using sampled rollouts and an advantage estimate \(A_t\), which measures whether an action was better than expected.",
+      "In continuous control, deterministic actor-critic methods often use \(\nabla_\theta J\approx\mathbb E[\nabla_a Q(s,a)|_{a=\mu_\theta(s)}\nabla_\theta\mu_\theta(s)]\). This makes RL look like optimizing a nonlinear feedback law with data rather than solving a Riccati equation.",
       "For control, reward design usually combines tracking error, energy, smoothness, constraint violation, and safety penalties. The mathematical objective may be simple, but the engineering challenge is making exploration and deployment safe."
     ],
     pidCompare: "Compared with PID, RL can represent nonlinear policies learned from data, but it gives up much of PID's transparency and usually needs a safety wrapper or model-based baseline."
@@ -185,6 +191,7 @@ function renderPage() {
           <a href="#demo">Demo</a>
           <a href="#implementation">Code</a>
           <a href="#references">References</a>
+          <a href="../overview.html">Overview</a>
         </div>
       </nav>
     </header>
